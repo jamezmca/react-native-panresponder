@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, FlatList } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { StyleSheet, Text, View, FlatList, PanResponder, Animated } from 'react-native';
 
 function getRandomColor() {
   var letters = '0123456789ABCDEF';
@@ -20,18 +20,83 @@ export default function App() {
       return i
     })
   })
+  const [dragging, setDragging] = useState(false)
+
+  const point = useRef(new Animated.ValueXY()).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      // Ask to be the responder:
+      onStartShouldSetPanResponder: (evt, gestureState) => true,
+      onStartShouldSetPanResponderCapture: (evt, gestureState) =>
+        true,
+      onMoveShouldSetPanResponder: (evt, gestureState) => true,
+      onMoveShouldSetPanResponderCapture: (evt, gestureState) =>
+        true,
+
+      onPanResponderGrant: (evt, gestureState) => {
+
+        setDragging(true)
+        // The gesture has started. Show visual feedback so the user knows
+        // what is happening!
+        // gestureState.d{x,y} will be set to zero now
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        Animated.event([{ y: point.y }], { useNativeDriver: false })({ y: gestureState.moveY })
+        // The most recent move distance is gestureState.move{X,Y}
+        // The accumulated gestFure distance since becoming responder is
+        // gestureState.d{x,y}
+      },
+      onPanResponderTerminationRequest: (evt, gestureState) =>
+        false,
+      onPanResponderRelease: (evt, gestureState) => {
+        reset()
+        // The user has released all touches while this view is the
+        // responder. This typically means a gesture has succeeded
+      },
+      onPanResponderTerminate: (evt, gestureState) => {
+        reset()
+        // Another component has become the responder, so this gesture
+        // should be cancelled
+      },
+      onShouldBlockNativeResponder: (evt, gestureState) => {
+        // Returns whether this component should block native components from becoming the JS
+        // responder. Returns true by default. Is currently only supported on android.
+        return true;
+      }
+    })
+  ).current;
+
+  function reset() {
+    setDragging(false)
+  }
+
+  const renderItem = ({ item }) => (
+    <View style={{
+      padding: 16,
+      backgroundColor: colorMap[item],
+      flexDirection: 'row'
+    }}>
+      <View {...panResponder.panHandlers}>
+        <Text style={{ fontSize: 28 }}>@</Text>
+      </View>
+      <Text style={{ fontSize: 22, textAlign: 'center', flex: 1 }}>{item}</Text>
+    </View>)
 
   return (
     <View style={styles.container}>
+      <Animated.View style={{
+        backgroundColor: 'black',
+        zIndex: 2,
+        width: '100%',
+        top: point.getLayout().top
+      }}>
+        {renderItem({ item: 3 })}
+      </Animated.View>
       <FlatList data={array.data}
+        scrollEnabled={!dragging}
         style={{ width: '100%' }}
-        renderItem={({ item }) => (
-          <View style={{ padding: 16, backgroundColor: colorMap[item], flexDirection: 'row' }}>
-            <View>
-              <Text style={{fontSize: 28}}>@</Text>
-            </View>
-            <Text style={{fontSize: 22, textAlign: 'center', flex: 1}}>{item}</Text>
-          </View>)}
+        renderItem={renderItem}
         keyExtractor={(item) => "" + item} />
       <StatusBar style="auto" />
     </View>
