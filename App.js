@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, Text, View, FlatList, PanResponder, Animated } from 'react-native';
 
 function getRandomColor() {
@@ -10,7 +10,6 @@ function getRandomColor() {
   }
   return color;
 }
-
 const colorMap = {}
 
 export default function App() {
@@ -20,9 +19,16 @@ export default function App() {
       return i
     })
   })
-  const [dragging, setDragging] = useState(false)
+
+  const [draggingIdx, setDraggingIdx] = useState(-1)
+  let dragging = false
+  let scrollOffset = 0
+  let flatListTopOffset = 0
+  let rowHeight = 0
+  let currentIdx = -1
 
   const point = useRef(new Animated.ValueXY()).current;
+
 
   const panResponder = useRef(
     PanResponder.create({
@@ -35,8 +41,11 @@ export default function App() {
         true,
 
       onPanResponderGrant: (evt, gestureState) => {
-
-        setDragging(true)
+        //console.log(gestureState.y0)
+        currentIdx = yToIndex(gestureState.y0)
+        console.log(currentIdx)
+        dragging = true
+        setDraggingIdx(currentIdx)
         // The gesture has started. Show visual feedback so the user knows
         // what is happening!
         // gestureState.d{x,y} will be set to zero now
@@ -67,16 +76,24 @@ export default function App() {
     })
   ).current;
 
+  function yToIndex(y) {
+    return Math.floor((scrollOffset + y - flatListTopOffset) / rowHeight)
+  }
+
   function reset() {
-    setDragging(false)
+    dragging = false
   }
 
   const renderItem = ({ item }) => (
-    <View style={{
-      padding: 16,
-      backgroundColor: colorMap[item],
-      flexDirection: 'row'
-    }}>
+    <View
+      onLayout={e => {
+        rowHeight = e.nativeEvent.layout.height
+      }}
+      style={{
+        padding: 16,
+        backgroundColor: colorMap[item],
+        flexDirection: 'row'
+      }}>
       <View {...panResponder.panHandlers}>
         <Text style={{ fontSize: 28 }}>@</Text>
       </View>
@@ -86,17 +103,25 @@ export default function App() {
   return (
     <View style={styles.container}>
       <Animated.View style={{
+        position: 'absolute',
         backgroundColor: 'black',
         zIndex: 2,
         width: '100%',
         top: point.getLayout().top
       }}>
-        {renderItem({ item: 3 })}
+        {renderItem({ item: draggingIdx })}
       </Animated.View>
       <FlatList data={array.data}
         scrollEnabled={!dragging}
         style={{ width: '100%' }}
         renderItem={renderItem}
+        onScroll={e => {
+          scrollOffset = e.nativeEvent.contentOffset.y
+        }}
+        onLayout={e => {
+          flatListTopOffset = e.nativeEvent.layout.y
+        }}
+        scrollEventThrottle={16}
         keyExtractor={(item) => "" + item} />
       <StatusBar style="auto" />
     </View>
